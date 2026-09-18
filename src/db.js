@@ -1,63 +1,27 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DATA_DIR, 'packages.db');
+let db;
 
-let db = null;
-
-export function initDB() {
+export function initDB(env = process.env) {
   if (db) return db;
-
-  // Ensure data directory exists
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  const key = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!env.SUPABASE_URL || !key) {
+    throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) are required');
   }
-
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-
-  // Create tables
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS packages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL,
-      description TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS versions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      package_id INTEGER NOT NULL,
-      version TEXT NOT NULL,
-      release_date DATETIME,
-      changelog TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(package_id) REFERENCES packages(id),
-      UNIQUE(package_id, version)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_versions_package_id ON versions(package_id);
-  `);
-
-  console.log('✅ Database initialized at:', DB_PATH);
+  db = createClient(env.SUPABASE_URL, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { transport: WebSocket }
+  });
   return db;
 }
 
 export function getDB() {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDB() first.');
-  }
+  if (!db) throw new Error('Database not initialized. Call initDB() first.');
   return db;
 }
 
-export function closeDB() {
-  if (db) {
-    db.close();
-    db = null;
-  }
+export async function closeDB() {
+  if (db) await db.removeAllChannels();
+  db = undefined;
 }

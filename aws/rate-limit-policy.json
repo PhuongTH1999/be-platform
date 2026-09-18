@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "UpdateRateLimitCounters",
+      "Effect": "Allow",
+      "Action": "dynamodb:UpdateItem",
+      "Resource": "arn:aws:dynamodb:us-east-1:346560662188:table/be-platform-rate-limit"
+    },
+    {
+      "Sid": "ManageApiConcurrency",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:PutFunctionConcurrency",
+        "lambda:DeleteFunctionConcurrency"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:346560662188:function:be-platform"
+    }
+  ]
+}

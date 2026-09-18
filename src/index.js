@@ -1,77 +1,32 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { createApp } from './app.js';
 import { initDB, closeDB } from './db.js';
-import routes from './routes.js';
+import projects from './projects.js';
 
-dotenv.config();
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// Request logging
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
-  next();
-});
-
-// Routes
-app.use('/api', routes);
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    name: 'Package Sync API',
-    version: '1.0.0',
-    description: 'Free public API to sync package versions and changelogs',
-    endpoints: {
-      health: 'GET /api/health',
-      listPackages: 'GET /api/packages',
-      getPackage: 'GET /api/packages/:name',
-      getVersions: 'GET /api/packages/:name/versions',
-      syncPackage: 'POST /api/packages/sync'
-    }
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Endpoint not found'
-  });
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    error: 'Internal server error'
-  });
-});
-
-// Graceful shutdown
-function shutdown() {
-  console.log('\n🛑 Shutting down gracefully...');
-  closeDB();
-  process.exit(0);
+dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
+const port = Number(process.env.PORT || 3000);
+let server;
+let stopping = false;
+async function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  const timeout = setTimeout(() => process.exit(1), 10000);
+  timeout.unref();
+  if (server) await new Promise(resolve => server.close(resolve));
+  await closeDB();
+  clearTimeout(timeout);
 }
-
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// Start server
 try {
-  initDB();
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
-    console.log(`📚 API docs at http://localhost:${PORT}/`);
-  });
+  const db = initDB();
+  for (const project of projects) await project.checkDatabase?.(db);
+  server = createApp().listen(port, '0.0.0.0', () => console.log(`be-platform listening on port ${port}`));
+  server.on('error', error => { console.error('Server failed:', error.message); process.exit(1); });
 } catch (error) {
-  console.error('Failed to start server:', error);
-  process.exit(1);
+  console.error('Failed to start server:', error.message);
+  await closeDB();
+  process.exitCode = 1;
 }

@@ -1,350 +1,143 @@
-# 📦 Package Sync API
-
-Free public API to sync and manage package versions and changelogs. Run locally 24/7 with Cloudflare Tunnel.
-
-## 🚀 Quick Start
-
-### 1. Install Dependencies
-```bash
-npm install
-```
-
-### 2. Start Server
-```bash
-npm start
-```
-
-Server runs on `http://localhost:3000`
-
-#### Development Mode (Auto-reload)
-```bash
-npm run dev
-```
-
-## 🔗 Setup Cloudflare Tunnel (Free Public Access)
-
-### Prerequisites
-- Free Cloudflare account (cloudflare.com)
-- Cloudflare CLI installed
-
-### Installation & Setup
-
-#### 1. Install Cloudflare CLI
-```bash
-# macOS
-brew install cloudflare/cloudflare/cf-cli
-
-# Linux/Windows
-# Download from: https://github.com/cloudflare/wrangler-cli/releases
-```
-
-#### 2. Login to Cloudflare
-```bash
-cloudflared login
-```
-This will open your browser to authenticate.
-
-#### 3. Create Tunnel
-```bash
-cloudflared tunnel create my-package-api
-```
-
-#### 4. Route Tunnel
-```bash
-# Create a config file: ~/.cloudflared/config.yml
-# Or use the command:
-cloudflared tunnel route dns my-package-api subdomain.example.com
-```
-
-**Option A: Without Domain**
-```bash
-cloudflared tunnel --url http://localhost:3000
-```
-This generates a random `*.trycloudflare.me` URL
-
-**Option B: With Cloudflare Domain** (recommended)
-1. Add domain to Cloudflare account
-2. Create config at `~/.cloudflared/config.yml`:
-```yaml
-tunnel: my-package-api
-credentials-file: ~/.cloudflared/my-package-api.json
-
-ingress:
-  - hostname: api.yourdomain.com
-    service: http://localhost:3000
-  - service: http_status:404
-```
-
-3. Route the tunnel:
-```bash
-cloudflared tunnel route dns my-package-api api.yourdomain.com
-```
-
-#### 5. Run Tunnel
-```bash
-cloudflared tunnel run my-package-api
-```
-
-Or use systemd/launchd for 24/7 service:
-```bash
-sudo cloudflared service install
-sudo systemctl start cloudflared
-```
-
-## 📚 API Endpoints
-
-### Health Check
-```bash
-GET /api/health
-```
-Response:
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
-
-### List All Packages
-```bash
-GET /api/packages
-```
-Response:
-```json
-{
-  "success": true,
-  "total": 2,
-  "packages": [
-    {
-      "id": 1,
-      "name": "my-package",
-      "description": "My awesome package",
-      "version_count": 3,
-      "latest_version": "1.2.0",
-      "created_at": "2024-01-15T10:00:00.000Z",
-      "updated_at": "2024-01-15T10:30:00.000Z"
-    }
-  ]
-}
-```
-
-### Get Package Details
-```bash
-GET /api/packages/:name
-```
-Example:
-```bash
-curl https://your-api.trycloudflare.me/api/packages/my-package
-```
-Response:
-```json
-{
-  "success": true,
-  "package": {
-    "id": 1,
-    "name": "my-package",
-    "description": "My awesome package",
-    "created_at": "2024-01-15T10:00:00.000Z",
-    "updated_at": "2024-01-15T10:30:00.000Z",
-    "versions": [
-      {
-        "id": 1,
-        "version": "1.2.0",
-        "release_date": "2024-01-15T10:30:00.000Z",
-        "changelog": "- Fixed bugs\n- Added features",
-        "created_at": "2024-01-15T10:30:00.000Z"
-      }
-    ]
-  }
-}
-```
-
-### Get Package Versions Only
-```bash
-GET /api/packages/:name/versions
-```
-Response:
-```json
-{
-  "success": true,
-  "package_name": "my-package",
-  "total_versions": 3,
-  "versions": [
-    {
-      "version": "1.2.0",
-      "release_date": "2024-01-15T10:30:00.000Z",
-      "changelog": "- Fixed bugs",
-      "created_at": "2024-01-15T10:30:00.000Z"
-    }
-  ]
-}
-```
-
-### Sync Package (Create/Update)
-```bash
-POST /api/packages/sync
-```
-
-Request body:
-```json
-{
-  "name": "my-package",
-  "description": "My awesome package",
-  "version": "1.2.0",
-  "releaseDate": "2024-01-15T10:30:00.000Z",
-  "changelog": "- Fixed bugs\n- Added features"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "message": "Package synced successfully",
-  "package": {
-    "name": "my-package",
-    "version": "1.2.0",
-    "description": "My awesome package"
-  }
-}
-```
-
-## 💡 Usage Examples
-
-### Client-side (JavaScript)
-```javascript
-// Sync a package
-const response = await fetch('https://your-api.trycloudflare.me/api/packages/sync', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    name: 'my-lib',
-    version: '2.0.0',
-    description: 'My library',
-    changelog: 'Major release'
-  })
-});
-
-const data = await response.json();
-console.log(data);
-
-// Get package info
-const pkg = await fetch('https://your-api.trycloudflare.me/api/packages/my-lib')
-  .then(r => r.json());
-console.log(pkg.package.versions);
-```
-
-### cURL
-```bash
-# Sync package
-curl -X POST https://your-api.trycloudflare.me/api/packages/sync \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "my-package",
-    "version": "1.0.0",
-    "description": "Test package",
-    "changelog": "Initial release"
-  }'
-
-# List packages
-curl https://your-api.trycloudflare.me/api/packages
-
-# Get package details
-curl https://your-api.trycloudflare.me/api/packages/my-package
-```
-
-## 📁 Project Structure
-```
-.
-├── src/
-│   ├── index.js          # Main server
-│   ├── db.js             # Database setup
-│   └── routes.js         # API routes
-├── data/                 # SQLite database (auto-created)
-├── package.json
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
-## 🗄️ Database
-
-**SQLite** - Local file-based database at `data/packages.db`
-
-### Tables
-- **packages**: name, description, timestamps
-- **versions**: package_id, version, changelog, release_date, timestamps
-
-## 🌐 Public Access
-
-### With Cloudflare Tunnel
-```
-https://your-custom-domain.com (with domain)
-OR
-https://xxxxxxxxxx.trycloudflare.me (without domain)
-```
-
-### Keep Running 24/7
-Option 1: Keep your computer on and running
-Option 2: Use a cloud VM or Docker container (still can use Cloudflare Tunnel)
-
-## 🔧 Environment Variables
-
-Create `.env` file:
-```
-PORT=3000
-NODE_ENV=production
-```
-
-## 📝 Notes
-
-- ✅ No authentication required (public API)
-- ✅ CORS enabled for browser requests
-- ✅ Supports up to 10MB payloads
-- ✅ SQLite auto-creates data directory
-- ✅ Graceful shutdown handling
-
-## 🚀 Deployment Options
-
-1. **Local 24/7** (Recommended for free)
-   - Keep machine running
-   - Use Cloudflare Tunnel
-   - No server costs
-
-2. **VPS/Cloud VM** ($5-20/month)
-   - Cheap VPS with Cloudflare Tunnel
-   - More reliable uptime
-
-3. **Railway/Render** (Free tier available)
-   - Direct hosting
-   - Docker support
-   - Limited free tier
-
-## 📞 Troubleshooting
-
-### Tunnel Connection Issues
-```bash
-# Restart tunnel
-cloudflared tunnel run my-package-api
-
-# Check status
-cloudflared tunnel list
-```
-
-### Database Locked
-- Restart server: `npm start`
-- Check if multiple processes running
-
-### Port Already in Use
-```bash
-# Kill process on port 3000
-lsof -ti:3000 | xargs kill -9
-
-# Or use different port
-PORT=3001 npm start
-```
-
-## 📄 License
-
-Free for everyone!
 # be-platform
+
+**Hướng dẫn thêm API/project, Supabase, test và deploy:** [docs/ADDING_API.md](docs/ADDING_API.md).
+
+Shared Node.js / Express backend. Supabase connection and HTTP server are managed at the repository root. Each project owns its routes, database checks and SQL in its own folder.
+
+```text
+src/
+  index.js       # environment, startup, shutdown
+  app.js         # shared middleware and route mounting
+  db.js          # shared Supabase client
+  projects.js    # project registry
+cornerstone-package/
+  src/project.js # project registration and startup check
+  src/routes.js  # package business logic
+  supabase-schema.sql
+Dockerfile
+scripts/package-lambda.sh
+```
+
+## Local startup
+
+Use Node.js 22 or later, then run from the repository root:
+
+```sh
+npm ci
+npm start
+npm test
+```
+
+Root `.env` settings (never commit credentials):
+
+```dotenv
+PORT=3000
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_SECRET_KEY=YOUR_SERVER_SECRET_KEY
+```
+
+Existing `SUPABASE_SERVICE_ROLE_KEY` is also accepted for compatibility. The root `.env` is used even when invoking the old Cornerstone entry point. Supabase tables must already exist; the server does not run SQL or migrate data on startup.
+
+## API
+
+- `GET /api/health`: shared process health.
+- `GET /`: project registry.
+- `/api/cornerstone-package/packages`: Cornerstone package endpoints.
+- `/api/packages`: compatibility alias for existing clients.
+
+Both prefixes support `GET /packages`, `POST /packages/sync`, `GET /packages/:scope/:name` and `GET /packages/:scope/:name/versions` relative to their `/api` or `/api/cornerstone-package` mount. Example: `/api/cornerstone-package/packages/momo-platform/cornerstone-native/versions`.
+
+The existing write API has no authentication. Anyone who can reach it can sync package data. Route namespaces organize projects; they are not access-control boundaries. Supabase server credentials must never be sent to clients.
+
+## Add a project
+
+1. Create `<project-name>/src/routes.js` exporting an Express router.
+2. Create `<project-name>/src/project.js` exporting `{ name, basePath, router, checkDatabase? }`.
+3. Register it in `src/projects.js`.
+4. Keep its SQL and business logic in its project folder. Import `getDB` from the shared `src/db.js`. Use distinct table names or a separately configured schema to avoid collisions.
+5. Add its source directory to `scripts/package-lambda.sh` so it is included in the Lambda ZIP.
+
+All modules currently use one Supabase project and the existing public schema. Cornerstone keeps its existing `packages` and `versions` tables; no tables or data were renamed.
+
+## Cornerstone SDUI templates
+
+See [SDUI API guide](cornerstone-package/SDUI_API.md) for CRUD endpoints, the Supabase migration and a sample template.
+
+## AWS Lambda
+
+The production API can run on AWS Lambda in `us-east-1` using
+`src/lambda.handler`. Build the deployment ZIP with `npm run package:lambda`.
+The Lambda uses a public Function URL and the same Supabase database. Keep
+`SUPABASE_URL` and `SUPABASE_SECRET_KEY` in Lambda environment variables;
+never include `.env` in the deployment ZIP.
+
+Production CORS is configured on the Lambda Function URL. Express only adds
+CORS headers during local development, preventing duplicate
+`Access-Control-Allow-Origin` headers in browser responses.
+
+Production URL:
+`https://yepswakp3nxo4qoeynn74xhnt40wqlia.lambda-url.us-east-1.on.aws/`
+
+All current and future `be-platform` routes use this same Function URL. Keep
+the route path unchanged when moving a client from local development to AWS:
+
+```text
+Local:      http://localhost:3000/api/...
+Production: https://yepswakp3nxo4qoeynn74xhnt40wqlia.lambda-url.us-east-1.on.aws/api/...
+```
+
+AWS request protection uses DynamoDB table `be-platform-rate-limit`:
+10,000 requests per UTC day globally and 60 requests per IP per minute. At
+the daily maximum, the API Lambda sets its reserved concurrency to zero. The
+`be-platform-daily-reset` Lambda is invoked by EventBridge at 00:00 UTC to
+remove that lock. Request bodies are limited to 1 MB.
+
+Deploy a code update from the repository root:
+
+```sh
+npm test
+npm run package:lambda
+aws lambda update-function-code \
+  --function-name be-platform \
+  --region us-east-1 \
+  --zip-file fileb://dist/be-platform-lambda.zip
+aws lambda wait function-updated \
+  --function-name be-platform \
+  --region us-east-1
+curl -fsS --max-time 60 \
+  https://yepswakp3nxo4qoeynn74xhnt40wqlia.lambda-url.us-east-1.on.aws/api/health
+```
+
+Source changes require a new Lambda deployment. Supabase data changes do not.
+Changing local `.env` does not update Lambda environment variables.
+
+### Check today's request usage
+
+The daily maximum is stored in Lambda environment variable
+`MAX_REQUESTS_PER_DAY`. The current UTC-day usage is stored in DynamoDB table
+`be-platform-rate-limit` with bucket `global#YYYY-MM-DD`. The counter resets at
+00:00 UTC (07:00 in Vietnam).
+
+```sh
+TODAY_UTC="$(date -u +%Y-%m-%d)"
+
+aws lambda get-function-configuration \
+  --function-name be-platform \
+  --region us-east-1 \
+  --query 'Environment.Variables.MAX_REQUESTS_PER_DAY' \
+  --output text
+
+aws dynamodb get-item \
+  --table-name be-platform-rate-limit \
+  --region us-east-1 \
+  --key "{\"bucket\":{\"S\":\"global#$TODAY_UTC\"}}" \
+  --consistent-read \
+  --query 'Item.request_count.N' \
+  --output text
+```
+
+In the AWS Console, open DynamoDB → Tables → `be-platform-rate-limit` →
+Explore table items to see `request_count`. Remaining requests are
+`MAX_REQUESTS_PER_DAY - request_count`. Lambda → `be-platform` → Monitor shows
+invocations, errors, throttles and duration; it does not calculate the custom
+daily remainder.

@@ -1,26 +1,23 @@
 {
-  "name": "be-platform",
+  "name": "package-sync-api",
   "version": "1.0.0",
-  "description": "Shared backend platform with project modules",
+  "description": "Free public API to sync package versions and changelogs",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test",
-    "package:lambda": "bash scripts/package-lambda.sh"
+    "migrate:sqlite": "node scripts/migrate-sqlite-to-supabase.js"
   },
   "dependencies": {
-    "@codegenie/serverless-express": "^4.17.0",
-    "@aws-sdk/client-dynamodb": "^3.883.0",
-    "@aws-sdk/client-lambda": "^3.883.0",
     "@supabase/supabase-js": "2.57.4",
+    "better-sqlite3": "^9.2.2",
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "ws": "^8.18.3"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=18.0.0"
   }
 }

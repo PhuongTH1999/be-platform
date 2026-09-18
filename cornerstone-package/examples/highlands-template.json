@@ -1,0 +1,90 @@
+{
+  "name": "Highlands Coffee",
+  "schema": {
+    "type": "template_widget",
+    "templateType": "SDUI_WIDGET",
+    "data": [
+      {
+        "type": "container",
+        "style": {
+          "backgroundColor": "#FFFFFF",
+          "padding": {
+            "all": 16
+          },
+          "cornerRadius": 12
+        },
+        "property": {
+          "layout": "column",
+          "spacing": 12,
+          "id": "root"
+        },
+        "value": {
+          "children": [
+            {
+              "type": "container",
+              "style": {},
+              "property": {
+                "layout": "row",
+                "spacing": 10,
+                "id": "content_row"
+              },
+              "value": {
+                "children": [
+                  {
+                    "type": "image",
+                    "style": {
+                      "cornerRadius": 24
+                    },
+                    "property": {
+                      "id": "hero_image"
+                    },
+                    "value": "https://static.momocdn.net/app/icon/promotion/logo.png"
+                  },
+                  {
+                    "type": "container",
+                    "style": {},
+                    "property": {
+                      "layout": "column",
+                      "spacing": 4,
+                      "id": "content_column"
+                    },
+                    "value": {
+                      "children": [
+                        {
+                          "type": "text",
+                          "style": {},
+                          "property": {
+                            "id": "headline"
+                          },
+                          "value": "Highlands Coffee"
+                        },
+                        {
+                          "type": "text",
+                          "style": {},
+                          "property": {
+                            "id": "description"
+                          },
+                          "value": "Giảm 50.000đ cho hóa đơn từ 150.000đ"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "button",
+                    "style": {},
+                    "property": {
+                      "id": "primary_action"
+                    },
+                    "value": {
+                      "title": "Thu thập"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
