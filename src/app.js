@@ -9,9 +9,11 @@ export function createApp(projectModules = projects) {
   // requests before invoking the function. Keep Express CORS for local use,
   // but do not emit a second Access-Control-Allow-Origin header on AWS.
   if (!process.env.AWS_LAMBDA_FUNCTION_NAME) app.use(cors());
-  app.use(createRateLimitMiddleware());
+  // Consume the Lambda adapter's request stream before middleware awaits I/O.
+  // Otherwise body-parser can receive an already-finished, unreadable stream.
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
+  app.use(createRateLimitMiddleware());
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
   app.get('/', (_req, res) => res.json({
     name: 'be-platform',
