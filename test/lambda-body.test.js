@@ -35,6 +35,6 @@ test('Lambda parses SDUI JSON before asynchronous rate limiting', async t => {
     body: JSON.stringify(body), isBase64Encoded: false
   }, {});
   assert.equal(response.statusCode, 201);
-  assert.deepEqual(saved, body);
+  assert.deepEqual(saved, { ...body, change_summary: null, updated_by: null });
   assert.equal(checks, 2);
 });

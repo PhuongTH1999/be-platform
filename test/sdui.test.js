@@ -82,3 +82,58 @@ test('Cornerstone mounts SDUI without a new project or changing package routes',
     assert.deepEqual(registry.projects.map(p => p.name), ['cornerstone-package']);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
+test('SDUI version history: change_summary / author on save, list and get versions', async () => {
+  const rows = new Map(); const versions = [];
+  // Mirrors the trigger in migrations/002: a version per insert and per update that changes name or schema.
+  const record = row => versions.push({ template_id: row.id, version: versions.filter(v => v.template_id === row.id).length + 1, name: row.name, schema: row.schema, change_summary: row.change_summary, created_by: row.updated_by, created_at: new Date().toISOString() });
+  const store = {
+    async create(body) { const row = { ...structuredClone(body), id: randomUUID() }; rows.set(row.id, row); record(row); return row; },
+    async update(id, body) {
+      const old = rows.get(id); if (!old) return null;
+      const row = { ...structuredClone(body), id }; rows.set(id, row);
+      if (old.name !== row.name || JSON.stringify(old.schema) !== JSON.stringify(row.schema)) record(row);
+      return row;
+    },
+    async exists(id) { return rows.has(id); },
+    async listVersions(id, limit, before) {
+      const all = versions.filter(v => v.template_id === id).sort((a, b) => b.version - a.version);
+      return { data: all.filter(v => !before || v.version < before).slice(0, limit).map(({ schema, template_id, ...rest }) => rest), count: all.length };
+    },
+    async getVersion(id, version) { const row = versions.find(v => v.template_id === id && v.version === version); if (!row) return null; const { template_id, ...rest } = row; return rest; }
+  };
+  const { server, url } = await start(store);
+  const request = (path, method, body) => fetch(url + path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    assert.equal((await request('', 'POST', { name: 'A', schema, change_summary: 5 })).status, 400);
+    assert.equal((await request('', 'POST', { name: 'A', schema, author: {} })).status, 400);
+    const { template } = await (await request('', 'POST', { name: 'A', schema, change_summary: ' Created ', author: 'dev@momo.vn' })).json();
+    const path = '/' + template.id;
+    assert.equal((await request(path, 'PUT', { name: 'A', schema: { ...schema, data: [] }, change_summary: 'x'.repeat(300) })).status, 200);
+    // No change_summary: stored as null, not the previous save's summary.
+    assert.equal((await request(path, 'PUT', { name: 'B', schema: { ...schema, data: [] } })).status, 200);
+    assert.equal((await request(path, 'PUT', { name: 'B', schema: { ...schema, data: [] }, change_summary: 'same' })).status, 200);
+
+    const list = await (await fetch(url + path + '/versions')).json();
+    assert.equal(list.total, 3);
+    assert.deepEqual(list.versions.map(v => v.version), [3, 2, 1]);
+    assert.equal(list.versions[0].change_summary, null);
+    assert.equal(list.versions[1].change_summary.length, 200);
+    assert.deepEqual([list.versions[2].change_summary, list.versions[2].created_by], ['Created', 'dev@momo.vn']);
+    assert.equal(list.versions[0].schema, undefined);
+    assert.deepEqual((await (await fetch(url + path + '/versions?limit=1&before=3')).json()).versions.map(v => v.version), [2]);
+    for (const query of ['limit=0', 'limit=201', 'before=0', 'before=x']) assert.equal((await fetch(url + path + '/versions?' + query)).status, 400);
+
+    const first = await (await fetch(url + path + '/versions/1')).json();
+    assert.deepEqual(first.version.schema, schema);
+    assert.equal((await fetch(url + path + '/versions/9')).status, 404);
+    assert.equal((await fetch(url + path + '/versions/abc')).status, 400);
+    assert.equal((await fetch(url + '/' + randomUUID() + '/versions')).status, 404);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
+test('SDUI reports a missing version migration as 503', async () => {
+  const { server, url } = await start({ listVersions: async () => { throw { code: 'PGRST205' }; } });
+  try { assert.equal((await fetch(url + '/' + randomUUID() + '/versions')).status, 503); }
+  finally { await new Promise(resolve => server.close(resolve)); }
+});

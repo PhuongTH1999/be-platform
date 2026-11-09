@@ -7,7 +7,10 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Validate the envelope, leaving widget types/properties open for renderer evolution.
 function validate(body) {
   if (!isObject(body)) return 'Body must be an object containing name and schema';
-  if (Object.keys(body).some(key => !['name', 'schema'].includes(key))) return 'Only name and schema are accepted';
+  if (Object.keys(body).some(key => !['name', 'schema', 'change_summary', 'author'].includes(key))) return 'Only name, schema, change_summary and author are accepted';
+  for (const key of ['change_summary', 'author']) {
+    if (body[key] != null && typeof body[key] !== 'string') return `${key} must be a string`;
+  }
   if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 200) return 'name must contain 1–200 characters';
   if (!isObject(body.schema) || body.schema.type !== 'template_widget' || body.schema.templateType !== 'SDUI_WIDGET' || !Array.isArray(body.schema.data)) {
     return 'schema must contain type=template_widget, templateType=SDUI_WIDGET and a data array';
@@ -24,6 +27,12 @@ function validate(body) {
   return null;
 }
 
+// Shown in the version history; cut rather than rejected so a long summary never blocks a save.
+const historyText = value => typeof value === 'string' && value.trim() ? value.trim().slice(0, 200) : null;
+// `author` is self-reported by the client: the API has no auth yet.
+const templateRow = body => ({ name: body.name.trim(), schema: body.schema, change_summary: historyText(body.change_summary), updated_by: historyText(body.author) });
+const positiveInt = value => typeof value === 'string' && /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 1000000;
+
 export function createSduiRouter(store = templateStore) {
   const router = Router();
   // Avoid stale templates after an update or delete.
@@ -36,7 +45,8 @@ export function createSduiRouter(store = templateStore) {
     try { await fn(req, res); }
     catch (error) {
       console.error('SDUI request failed:', error.code || 'database_error');
-      if (['42P01', 'PGRST205'].includes(error.code)) {
+      // Missing table (001 / 002 not applied) or missing column (002 not applied).
+      if (['42P01', 'PGRST205', '42703', 'PGRST204'].includes(error.code)) {
         return res.status(503).json({ error: 'SDUI storage is not initialized' });
       }
       res.status(500).json({ error: 'Unable to process SDUI template request' });
@@ -53,13 +63,28 @@ export function createSduiRouter(store = templateStore) {
   router.post('/templates', handle(async (req, res) => {
     const error = validate(req.body);
     if (error) return res.status(400).json({ error });
-    const template = await store.create({ name: req.body.name.trim(), schema: req.body.schema });
+    const template = await store.create(templateRow(req.body));
     res.location(`${req.baseUrl}/templates/${template.id}`).status(201).json({ success: true, template });
   }));
   router.get('/templates/:id/json', handle(async (req, res) => {
     const template = await store.get(req.params.id);
     if (!template) return res.status(404).json({ error: 'Template not found' });
     res.json(template.schema);
+  }));
+  router.get('/templates/:id/versions', handle(async (req, res) => {
+    const { limit = '50', before } = req.query;
+    if (!positiveInt(limit) || Number(limit) > 200 || (before !== undefined && !positiveInt(before))) {
+      return res.status(400).json({ error: 'limit must be 1–200 and before a positive integer' });
+    }
+    const { data, count } = await store.listVersions(req.params.id, Number(limit), before && Number(before));
+    if (!data.length && !await store.exists(req.params.id)) return res.status(404).json({ error: 'Template not found' });
+    res.json({ success: true, total: count, limit: Number(limit), versions: data });
+  }));
+  router.get('/templates/:id/versions/:version', handle(async (req, res) => {
+    if (!positiveInt(req.params.version)) return res.status(400).json({ error: 'version must be a positive integer' });
+    const version = await store.getVersion(req.params.id, Number(req.params.version));
+    if (!version) return res.status(404).json({ error: await store.exists(req.params.id) ? 'Version not found' : 'Template not found' });
+    res.json({ success: true, version });
   }));
   router.get('/templates/:id', handle(async (req, res) => {
     const template = await store.get(req.params.id);
@@ -69,7 +94,7 @@ export function createSduiRouter(store = templateStore) {
   router.put('/templates/:id', handle(async (req, res) => {
     const error = validate(req.body);
     if (error) return res.status(400).json({ error });
-    const template = await store.update(req.params.id, { name: req.body.name.trim(), schema: req.body.schema });
+    const template = await store.update(req.params.id, templateRow(req.body));
     if (!template) return res.status(404).json({ error: 'Template not found' });
     res.json({ success: true, template });
   }));

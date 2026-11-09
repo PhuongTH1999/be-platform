@@ -1,9 +1,11 @@
 import express from 'express';
 import { getDB } from './db.js';
 import sduiRoutes from './sdui-routes.js';
+import snapshotRoutes from './snapshot-routes.js';
 
 const router = express.Router();
 router.use('/sdui', sduiRoutes);
+router.use('/layout-snapshots', snapshotRoutes);
 
 router.post('/packages/sync', async (req, res) => {
   try {
