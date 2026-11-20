@@ -13,6 +13,12 @@ create table if not exists public.versions (
   release_date timestamptz,
   changelog text,
   created_at timestamptz not null default now(),
+  -- Release notes (migrations/004_add_version_release_notes.sql).
+  release_type text check (release_type in ('feature', 'hotfix')),
+  summary text,
+  service_action text,
+  notes_updated_at timestamptz,
+  notes_updated_by text check (char_length(notes_updated_by) <= 200),
   unique (package_id, version)
 );
 

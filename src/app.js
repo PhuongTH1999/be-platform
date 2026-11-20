@@ -26,7 +26,8 @@ export function createApp(projectModules = projects) {
   app.use((_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
   app.use((err, _req, res, _next) => {
     console.error('Request failed:', err.message);
-    res.status(err.status || 500).json({ error: err.status === 400 ? 'Invalid request body' : 'Internal server error' });
+    const messages = { 400: 'Invalid request body', 413: 'Request body too large' };
+    res.status(err.status || 500).json({ error: messages[err.status] || 'Internal server error' });
   });
   return app;
 }

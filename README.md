@@ -45,9 +45,9 @@ Existing `SUPABASE_SERVICE_ROLE_KEY` is also accepted for compatibility. The roo
 - `/api/cornerstone-package/packages`: Cornerstone package endpoints.
 - `/api/packages`: compatibility alias for existing clients.
 
-Both prefixes support `GET /packages`, `POST /packages/sync`, `GET /packages/:scope/:name` and `GET /packages/:scope/:name/versions` relative to their `/api` or `/api/cornerstone-package` mount. Example: `/api/cornerstone-package/packages/momo-platform/cornerstone-native/versions`.
+Both prefixes support `GET /packages`, `POST /packages/sync`, `GET /packages/:scope/:name`, `GET /packages/:scope/:name/versions` and `PATCH /packages/:scope/:name/versions/:version` (release notes, see [API_QUICK_START.md](cornerstone-package/API_QUICK_START.md)) relative to their `/api` or `/api/cornerstone-package` mount. Example: `/api/cornerstone-package/packages/momo-platform/cornerstone-native/versions`.
 
-The existing write API has no authentication. Anyone who can reach it can sync package data. Route namespaces organize projects; they are not access-control boundaries. Supabase server credentials must never be sent to clients.
+The write APIs (`POST /packages/sync`, `PATCH .../versions/:version`) have no authentication. Anyone who can reach them can sync package data or edit release notes. Route namespaces organize projects; they are not access-control boundaries. Supabase server credentials must never be sent to clients.
 
 ## Add a project
 
