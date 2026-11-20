@@ -133,6 +133,33 @@ test('re-sync never overwrites edited notes; releaseType only fills an empty rel
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
+test('re-sync keeps a stored releaseDate / changelog when omitted; the Mini App payload still overwrites both', async () => {
+  const store = memoryStore();
+  const { server, url } = await start(store);
+  const synced = () => pick(store.versions[0], ['release_date', 'changelog']);
+  try {
+    await send(`${url}/sync`, 'POST', legacyPayload);
+    for (const body of [
+      { name: legacyPayload.name, version: legacyPayload.version },
+      { name: legacyPayload.name, version: legacyPayload.version, releaseDate: null, changelog: '' }
+    ]) {
+      assert.equal((await send(`${url}/sync`, 'POST', body)).status, 201);
+      assert.deepEqual(synced(), { release_date: legacyPayload.releaseDate, changelog: '- cache' });
+    }
+    await send(`${url}/sync`, 'POST', { name: legacyPayload.name, version: legacyPayload.version, releaseDate: '2025-01-02T00:00:00.000Z' });
+    assert.deepEqual(synced(), { release_date: '2025-01-02T00:00:00.000Z', changelog: '- cache' });
+    // Shape sent by miniapp packages/scripts/sync-api.cjs: every field present, so both are replaced as before.
+    const miniApp = { name: legacyPayload.name, description: 'd', version: legacyPayload.version, releaseDate: '2026-11-20T00:00:00.000Z', changelog: 'Release 1.1.0' };
+    await send(`${url}/sync`, 'POST', miniApp);
+    assert.deepEqual(synced(), { release_date: miniApp.releaseDate, changelog: 'Release 1.1.0' });
+    assert.equal(store.packages[0].description, 'd');
+    // A new version synced without them starts with nulls.
+    await send(`${url}/sync`, 'POST', { name: legacyPayload.name, version: '0.9.0' });
+    assert.deepEqual(pick(store.versions[1], ['release_date', 'changelog']), { release_date: null, changelog: null });
+    assert.equal(store.versions.length, 2);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
 test('503 when migration 004 is missing on PATCH and on sync with releaseType', async () => {
   const missing = Object.assign(new Error('column versions.summary does not exist'), { code: '42703' });
   const store = { ...memoryStore(), async findPackage() { return { id: 1 }; }, async updatePackage() {}, async findVersion() { return null; }, async updateNotes() { throw missing; }, async insertVersion(row) { if (row.release_type) throw Object.assign(new Error('x'), { code: 'PGRST204' }); } };

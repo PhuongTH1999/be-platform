@@ -67,17 +67,21 @@ export function createPackageRouter(store = packageStore, now = () => new Date()
 
       const existingVersion = await store.findVersion(packageId, version);
       // Only the synced fields: release notes edited in the tool are never overwritten.
-      const versionData = {
-        package_id: packageId,
-        version,
-        release_date: releaseDate || null,
-        changelog: changelog || null
-      };
+      // On re-sync an omitted (or empty) releaseDate / changelog keeps the stored value.
+      const synced = {};
+      if (releaseDate) synced.release_date = releaseDate;
+      if (changelog) synced.changelog = changelog;
       if (existingVersion) {
-        await store.updateVersion(existingVersion.id, versionData);
+        if (Object.keys(synced).length) await store.updateVersion(existingVersion.id, synced);
         if (releaseType) await store.fillReleaseType(existingVersion.id, releaseType);
       } else {
-        await store.insertVersion(releaseType ? { ...versionData, release_type: releaseType } : versionData);
+        await store.insertVersion({
+          package_id: packageId,
+          version,
+          release_date: synced.release_date || null,
+          changelog: synced.changelog || null,
+          ...(releaseType && { release_type: releaseType })
+        });
       }
 
       res.status(201).json({
